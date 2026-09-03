@@ -1,0 +1,59 @@
+name: Build libKontur.so
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Set up JDK 11
+      uses: actions/setup-java@v3
+      with:
+        java-version: '11'
+        distribution: 'temurin'
+    
+    - name: Setup Android NDK
+      uses: nttld/setup-ndk@v1
+      with:
+        ndk-version: r25c
+        add-to-path: true
+    
+    - name: Build with ndk-build
+      run: |
+        cd jni
+        ndk-build -j$(nproc)
+    
+    - name: Upload arm64-v8a artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: libKontur-arm64-v8a
+        path: libs/arm64-v8a/libKontur.so
+    
+    - name: Upload armeabi-v7a artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: libKontur-armeabi-v7a
+        path: libs/armeabi-v7a/libKontur.so
+    
+    - name: Create release archives
+      run: |
+        mkdir -p release
+        cp libs/arm64-v8a/libKontur.so release/libKontur_arm64-v8a.so
+        cp libs/armeabi-v7a/libKontur.so release/libKontur_armeabi-v7a.so
+        cd release
+        tar -czf libKontur-all.tar.gz *.so
+    
+    - name: Upload release archive
+      uses: actions/upload-artifact@v3
+      with:
+        name: libKontur-release
+        path: release/libKontur-all.tar.gz
