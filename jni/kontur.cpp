@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/mman.h>
-#include <wchar.h>
+#include <stdint.h>
 
 #define LOG_TAG "KonturMod"
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
@@ -18,7 +18,7 @@ typedef void* (*il2cpp_assembly_get_image_t)(void* assembly);
 typedef void* (*il2cpp_class_from_name_t)(void* image, const char* namespaze, const char* name);
 typedef void* (*il2cpp_class_get_methods_t)(void* klass, void** iter);
 typedef const char* (*il2cpp_method_get_name_t)(void* method);
-typedef void* (*il2cpp_resolve_icall_t)(const char* name);
+typedef void* (*il2cpp_string_new_t)(const char* str);
 
 static il2cpp_domain_get_t il2cpp_domain_get;
 static il2cpp_domain_get_assemblies_t il2cpp_domain_get_assemblies;
@@ -26,6 +26,7 @@ static il2cpp_assembly_get_image_t il2cpp_assembly_get_image;
 static il2cpp_class_from_name_t il2cpp_class_from_name;
 static il2cpp_class_get_methods_t il2cpp_class_get_methods;
 static il2cpp_method_get_name_t il2cpp_method_get_name;
+static il2cpp_string_new_t il2cpp_string_new;
 
 // Original UnityWebRequest.set_url function pointer
 static void* original_set_url = nullptr;
@@ -79,44 +80,96 @@ typedef struct Il2CppString {
     void* klass;
     void* monitor;
     int32_t length;
-    wchar_t chars[1];
+    uint16_t chars[1]; // UTF-16 characters
 } Il2CppString;
 
 typedef void (*set_url_func)(void* thisPtr, Il2CppString* url);
 
+// Simple UTF-16 to UTF-8 conversion (basic ASCII/Latin-1 subset)
+static void utf16_to_utf8(const uint16_t* utf16, int len, char* out, size_t out_size) {
+    size_t pos = 0;
+    for (int i = 0; i < len && pos < out_size - 1; i++) {
+        if (utf16[i] < 0x80) {
+            out[pos++] = (char)utf16[i];
+        } else if (utf16[i] < 0x800) {
+            if (pos + 1 < out_size - 1) {
+                out[pos++] = 0xC0 | (utf16[i] >> 6);
+                out[pos++] = 0x80 | (utf16[i] & 0x3F);
+            }
+        } else {
+            if (pos + 2 < out_size - 1) {
+                out[pos++] = 0xE0 | (utf16[i] >> 12);
+                out[pos++] = 0x80 | ((utf16[i] >> 6) & 0x3F);
+                out[pos++] = 0x80 | (utf16[i] & 0x3F);
+            }
+        }
+    }
+    out[pos] = '\0';
+}
+
+// Simple UTF-16 strstr
+static uint16_t* utf16_strstr(const uint16_t* haystack, const char* needle) {
+    size_t needle_len = strlen(needle);
+    const uint16_t* p = haystack;
+    
+    while (*p) {
+        bool match = true;
+        for (size_t i = 0; i < needle_len; i++) {
+            if (p[i] != (uint16_t)needle[i]) {
+                match = false;
+                break;
+            }
+        }
+        if (match) return (uint16_t*)p;
+        p++;
+    }
+    return nullptr;
+}
+
 static void hooked_set_url_impl(void* thisPtr, Il2CppString* url) {
     if (url && url->length > 0) {
-        // Convert wide string to char for logging
+        // Convert UTF-16 to UTF-8 for logging and processing
         char buffer[512] = {0};
-        wcstombs(buffer, url->chars, sizeof(buffer) - 1);
+        utf16_to_utf8(url->chars, url->length, buffer, sizeof(buffer));
         
         LOGD("UnityWebRequest.set_url called: %s", buffer);
         
         // Check if URL contains target domain
-        if (wcsstr(url->chars, L"konturinf.net")) {
+        if (strstr(buffer, TARGET_DOMAIN)) {
             LOGD("Intercepting konturinf.net -> kntrmod.ru");
             
-            // Replace domain in-place
-            wchar_t* pos = wcsstr(url->chars, L"konturinf.net");
+            // Find position in UTF-16 string
+            uint16_t* pos = utf16_strstr(url->chars, TARGET_DOMAIN);
             if (pos) {
-                // Construct new URL
-                wchar_t new_url[512] = {0};
-                size_t prefix_len = pos - url->chars;
-                wcsncpy(new_url, url->chars, prefix_len);
-                wcscat(new_url, L"kntrmod.ru");
-                wcscat(new_url, pos + wcslen(L"konturinf.net"));
+                // Build new URL string
+                char new_url[512] = {0};
+                size_t prefix_len = 0;
+                utf16_to_utf8(url->chars, pos - url->chars, new_url, sizeof(new_url));
+                prefix_len = strlen(new_url);
                 
-                // Modify the Il2CppString in-place (risky but fast)
-                wcscpy(url->chars, new_url);
-                url->length = wcslen(new_url);
+                // Add replacement domain
+                strncat(new_url, REPLACEMENT_DOMAIN, sizeof(new_url) - prefix_len - 1);
                 
-                wcstombs(buffer, new_url, sizeof(buffer) - 1);
-                LOGD("Redirected to: %s", buffer);
+                // Add suffix (everything after original domain)
+                char suffix[256] = {0};
+                utf16_to_utf8(pos + strlen(TARGET_DOMAIN), 
+                             url->length - (pos - url->chars) - strlen(TARGET_DOMAIN),
+                             suffix, sizeof(suffix));
+                strncat(new_url, suffix, sizeof(new_url) - strlen(new_url) - 1);
+                
+                LOGD("Redirected to: %s", new_url);
+                
+                // Create new Il2CppString through IL2CPP API
+                Il2CppString* new_string = (Il2CppString*)il2cpp_string_new(new_url);
+                if (new_string) {
+                    // Replace the url pointer (caller will use new string)
+                    url = new_string;
+                }
             }
         }
     }
     
-    // Call original
+    // Call original with potentially modified url
     if (original_set_url) {
         ((set_url_func)original_set_url)(thisPtr, url);
     }
@@ -203,6 +256,7 @@ static bool init_il2cpp() {
     RESOLVE(il2cpp_class_from_name);
     RESOLVE(il2cpp_class_get_methods);
     RESOLVE(il2cpp_method_get_name);
+    RESOLVE(il2cpp_string_new);
     
     #undef RESOLVE
     
