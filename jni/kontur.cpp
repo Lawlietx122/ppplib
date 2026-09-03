@@ -29,7 +29,7 @@ static il2cpp_method_get_name_t il2cpp_method_get_name;
 static il2cpp_string_new_t il2cpp_string_new;
 
 // Original UnityWebRequest.set_url function pointer
-static void* original_set_url = nullptr;
+static set_url_func original_set_url_func = nullptr;
 
 // Replacement domain for URL interception
 static const char* TARGET_DOMAIN = "storyinc.ru";
@@ -170,21 +170,9 @@ static void hooked_set_url_impl(void* thisPtr, Il2CppString* url) {
     }
     
     // Call original with potentially modified url
-    if (original_set_url) {
-        ((set_url_func)original_set_url)(thisPtr, url);
+    if (original_set_url_func) {
+        original_set_url_func(thisPtr, url);
     }
-}
-
-// ARM64 trampoline wrapper (needed because inline hook overwrites first instruction)
-__attribute__((naked))
-static void hooked_set_url() {
-    __asm__ volatile(
-        "stp x29, x30, [sp, #-16]!\n"
-        "mov x29, sp\n"
-        "bl hooked_set_url_impl\n"
-        "ldp x29, x30, [sp], #16\n"
-        "ret\n"
-    );
 }
 
 // Find and hook UnityWebRequest.set_url
@@ -219,9 +207,9 @@ static bool hook_unity_web_request() {
             if (method_name && strcmp(method_name, "set_url") == 0) {
                 LOGD("Found set_url method at %p", method);
                 
-                // Hook it
-                original_set_url = method;
-                if (inline_hook_arm64(method, (void*)hooked_set_url, nullptr)) {
+                // Save original and hook it
+                original_set_url_func = (set_url_func)method;
+                if (inline_hook_arm64(method, (void*)hooked_set_url_impl, nullptr)) {
                     LOGD("Successfully hooked UnityWebRequest.set_url");
                     return true;
                 } else {
