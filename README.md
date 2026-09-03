@@ -1,11 +1,11 @@
 # libKontur - Minimalist Network Redirector
 
-Native Android library for Unity IL2CPP games that redirects network requests from `konturinf.net` to `kntrmod.ru`.
+Native Android library for Unity IL2CPP games that redirects network requests from `storyinc.ru` to `kntrmod.ru`.
 
 ## Features
 
 - Hooks `UnityWebRequest.set_url` at runtime
-- Transparent URL redirection
+- Transparent URL redirection (storyinc.ru → kntrmod.ru)
 - ARM64 and ARMv7 support
 - Zero dependencies (pure C++)
 - Logs activity to logcat for debugging

@@ -32,7 +32,7 @@ static il2cpp_string_new_t il2cpp_string_new;
 static void* original_set_url = nullptr;
 
 // Replacement domain for URL interception
-static const char* TARGET_DOMAIN = "konturinf.net";
+static const char* TARGET_DOMAIN = "storyinc.ru";
 static const char* REPLACEMENT_DOMAIN = "kntrmod.ru";
 
 // Simple inline hook for ARM64 (B instruction - branch)
