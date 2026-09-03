@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/mman.h>
+#include <wchar.h>
 
 #define LOG_TAG "KonturMod"
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
@@ -83,7 +84,7 @@ typedef struct Il2CppString {
 
 typedef void (*set_url_func)(void* thisPtr, Il2CppString* url);
 
-static void* hooked_set_url_impl(void* thisPtr, Il2CppString* url) {
+static void hooked_set_url_impl(void* thisPtr, Il2CppString* url) {
     if (url && url->length > 0) {
         // Convert wide string to char for logging
         char buffer[512] = {0};
@@ -117,10 +118,8 @@ static void* hooked_set_url_impl(void* thisPtr, Il2CppString* url) {
     
     // Call original
     if (original_set_url) {
-        return ((set_url_func)original_set_url)(thisPtr, url);
+        ((set_url_func)original_set_url)(thisPtr, url);
     }
-    
-    return nullptr;
 }
 
 // ARM64 trampoline wrapper (needed because inline hook overwrites first instruction)
