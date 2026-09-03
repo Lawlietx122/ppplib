@@ -136,7 +136,7 @@ static void hooked_set_url_impl(void* thisPtr, Il2CppString* url) {
         
         // Check if URL contains target domain
         if (strstr(buffer, TARGET_DOMAIN)) {
-            LOGD("Intercepting konturinf.net -> kntrmod.ru");
+            LOGD("Intercepting storyinc.ru -> kntrmod.ru");
             
             // Find position in UTF-16 string
             uint16_t* pos = utf16_strstr(url->chars, TARGET_DOMAIN);
@@ -268,7 +268,7 @@ static bool init_il2cpp() {
 JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved) {
     LOGD("=== KonturMod loaded ===");
     LOGD("Version: 1.0 minimalist");
-    LOGD("Target: konturinf.net -> kntrmod.ru");
+    LOGD("Target: storyinc.ru -> kntrmod.ru");
     
     // Wait for IL2CPP to be loaded by Unity
     sleep(2);
