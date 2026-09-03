@@ -28,6 +28,16 @@ static il2cpp_class_get_methods_t il2cpp_class_get_methods;
 static il2cpp_method_get_name_t il2cpp_method_get_name;
 static il2cpp_string_new_t il2cpp_string_new;
 
+// Forward declarations
+typedef struct Il2CppString {
+    void* klass;
+    void* monitor;
+    int32_t length;
+    uint16_t chars[1]; // UTF-16 characters
+} Il2CppString;
+
+typedef void (*set_url_func)(void* thisPtr, Il2CppString* url);
+
 // Original UnityWebRequest.set_url function pointer
 static set_url_func original_set_url_func = nullptr;
 
@@ -75,16 +85,6 @@ bool inline_hook_arm64(void* target, void* replacement, void** backup) {
 }
 
 // Hooked UnityWebRequest.set_url
-// Signature: void UnityWebRequest::set_url(UnityWebRequest* this, Il2CppString* url)
-typedef struct Il2CppString {
-    void* klass;
-    void* monitor;
-    int32_t length;
-    uint16_t chars[1]; // UTF-16 characters
-} Il2CppString;
-
-typedef void (*set_url_func)(void* thisPtr, Il2CppString* url);
-
 // Simple UTF-16 to UTF-8 conversion (basic ASCII/Latin-1 subset)
 static void utf16_to_utf8(const uint16_t* utf16, int len, char* out, size_t out_size) {
     size_t pos = 0;
